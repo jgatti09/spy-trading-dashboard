@@ -384,6 +384,39 @@
         
         <!-- DASHBOARD PAGE -->
         <div id="dashboardPage" class="page active">
+            <!-- TradingView Chart Widget -->
+            <div class="card" style="margin-bottom: 24px;">
+                <h2>Live SPY Chart</h2>
+                <div style="height: 500px; border-radius: 12px; overflow: hidden;">
+                    <!-- TradingView Widget BEGIN -->
+                    <div class="tradingview-widget-container" style="height:100%;width:100%">
+                        <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                        {
+                            "autosize": true,
+                            "symbol": "AMEX:SPY",
+                            "interval": "240",
+                            "timezone": "America/New_York",
+                            "theme": "dark",
+                            "style": "1",
+                            "locale": "en",
+                            "backgroundColor": "rgba(0, 0, 0, 1)",
+                            "hide_top_toolbar": false,
+                            "hide_legend": false,
+                            "allow_symbol_change": false,
+                            "save_image": false,
+                            "calendar": false,
+                            "support_host": "https://www.tradingview.com"
+                        }
+                        </script>
+                    </div>
+                    <!-- TradingView Widget END -->
+                </div>
+                <p style="margin-top: 12px; font-size: 0.85em; color: #6b7280; text-align: center;">
+                    4-Hour timeframe chart. Draw your zones manually on the chart or use the AI suggestions below.
+                </p>
+            </div>
+            
             <div class="signals" id="topSignals" style="margin-bottom: 24px;">
                 <h2 style="color: #0d0d0d; margin-bottom: 20px; font-weight: 600;">Trade Signals & Alerts</h2>
                 <div id="signalContent">
@@ -451,6 +484,7 @@
                     </div>
                     <div class="zone-list" id="zoneList"></div>
                     <button onclick="clearAllZones()" style="background: #ef4444; margin-top: 12px;">Clear All Zones</button>
+                    <button onclick="suggestZones()" style="background: #f59e0b; margin-top: 12px;">🎯 Suggest Zones (AI)</button>
                     <button onclick="loadHistoricalData()" style="background: #10b981; margin-top: 12px;">📊 Analyze Historical Performance</button>
                 </div>
             </div>
@@ -734,6 +768,356 @@
             document.body.appendChild(alertDiv);
             
             setTimeout(() => alertDiv.remove(), 8000);
+        }
+        
+        async function suggestZones() {
+            if (!polygonApiKey) {
+                alert('Please connect to Polygon.io first');
+                return;
+            }
+            
+            const loadingDiv = document.getElementById('historicalAnalysis');
+            loadingDiv.innerHTML = '<div class="card"><h2>🎯 Analyzing Market Data...</h2><p style="color: #6b7280;">Using AI to detect supply and demand zones based on 90 days of price action...</p></div>';
+            
+            try {
+                // Get 90 days of daily data
+                const to = new Date();
+                const from = new Date();
+                from.setDate(from.getDate() - 90);
+                
+                const fromStr = from.toISOString().split('T')[0];
+                const toStr = to.toISOString().split('T')[0];
+                
+                const response = await fetch(
+                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/1/day/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load data');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.results || data.results.length === 0) {
+                    throw new Error('No data available');
+                }
+                
+                const candles = data.results;
+                const detectedZones = detectZones(candles);
+                
+                displaySuggestedZones(detectedZones);
+                
+            } catch (error) {
+                loadingDiv.innerHTML = `<div class="card"><h2>Error</h2><p style="color: #ef4444;">${error.message}</p></div>`;
+            }
+        }
+        
+        function detectZones(candles) {
+            const supplyZones = [];
+            const demandZones = [];
+            const zoneWidth = 3; // 3 point zone width
+            const minZoneDistance = 5; // Minimum 5 points between zones
+            
+            // Find swing highs (potential supply zones)
+            for (let i = 2; i < candles.length - 2; i++) {
+                const current = candles[i];
+                const prev1 = candles[i - 1];
+                const prev2 = candles[i - 2];
+                const next1 = candles[i + 1];
+                const next2 = candles[i + 2];
+                
+                // Swing high: current high is higher than surrounding candles
+                if (current.h > prev1.h && current.h > prev2.h && 
+                    current.h > next1.h && current.h > next2.h) {
+                    
+                    const zoneTop = current.h;
+                    const zoneBottom = current.h - zoneWidth;
+                    
+                    // Count how many times this zone was tested
+                    let tests = 0;
+                    let bounces = 0;
+                    
+                    for (let j = i + 1; j < candles.length; j++) {
+                        const testCandle = candles[j];
+                        
+                        // Price entered zone
+                        if (testCandle.h >= zoneBottom && testCandle.l <= zoneTop) {
+                            tests++;
+                            
+                            // Bearish reversal (close lower than open)
+                            if (testCandle.c < testCandle.o) {
+                                bounces++;
+                            }
+                        }
+                    }
+                    
+                    // Calculate recency score (more recent = higher score)
+                    const recencyScore = i / candles.length;
+                    
+                    // Calculate confidence (tests, bounces, recency)
+                    const confidence = ((bounces / (tests + 1)) * 50) + (tests * 10) + (recencyScore * 40);
+                    
+                    supplyZones.push({
+                        top: zoneTop,
+                        bottom: zoneBottom,
+                        tests: tests,
+                        bounces: bounces,
+                        confidence: Math.min(confidence, 100),
+                        index: i,
+                        date: new Date(candles[i].t).toLocaleDateString()
+                    });
+                }
+            }
+            
+            // Find swing lows (potential demand zones)
+            for (let i = 2; i < candles.length - 2; i++) {
+                const current = candles[i];
+                const prev1 = candles[i - 1];
+                const prev2 = candles[i - 2];
+                const next1 = candles[i + 1];
+                const next2 = candles[i + 2];
+                
+                // Swing low: current low is lower than surrounding candles
+                if (current.l < prev1.l && current.l < prev2.l && 
+                    current.l < next1.l && current.l < next2.l) {
+                    
+                    const zoneBottom = current.l;
+                    const zoneTop = current.l + zoneWidth;
+                    
+                    // Count how many times this zone was tested
+                    let tests = 0;
+                    let bounces = 0;
+                    
+                    for (let j = i + 1; j < candles.length; j++) {
+                        const testCandle = candles[j];
+                        
+                        // Price entered zone
+                        if (testCandle.l <= zoneTop && testCandle.h >= zoneBottom) {
+                            tests++;
+                            
+                            // Bullish reversal (close higher than open)
+                            if (testCandle.c > testCandle.o) {
+                                bounces++;
+                            }
+                        }
+                    }
+                    
+                    // Calculate recency score
+                    const recencyScore = i / candles.length;
+                    
+                    // Calculate confidence
+                    const confidence = ((bounces / (tests + 1)) * 50) + (tests * 10) + (recencyScore * 40);
+                    
+                    demandZones.push({
+                        top: zoneTop,
+                        bottom: zoneBottom,
+                        tests: tests,
+                        bounces: bounces,
+                        confidence: Math.min(confidence, 100),
+                        index: i,
+                        date: new Date(candles[i].t).toLocaleDateString()
+                    });
+                }
+            }
+            
+            // Sort by confidence
+            supplyZones.sort((a, b) => b.confidence - a.confidence);
+            demandZones.sort((a, b) => b.confidence - a.confidence);
+            
+            // Filter out zones too close together
+            const filteredSupply = filterCloseZones(supplyZones, minZoneDistance);
+            const filteredDemand = filterCloseZones(demandZones, minZoneDistance);
+            
+            // Take top 4 of each
+            return {
+                supply: filteredSupply.slice(0, 4),
+                demand: filteredDemand.slice(0, 4)
+            };
+        }
+        
+        function filterCloseZones(zones, minDistance) {
+            const filtered = [];
+            
+            for (let i = 0; i < zones.length; i++) {
+                const zone = zones[i];
+                let tooClose = false;
+                
+                for (let j = 0; j < filtered.length; j++) {
+                    const existing = filtered[j];
+                    const distance = Math.abs(zone.bottom - existing.bottom);
+                    
+                    if (distance < minDistance) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                
+                if (!tooClose) {
+                    filtered.push(zone);
+                }
+            }
+            
+            return filtered;
+        }
+        
+        function displaySuggestedZones(detectedZones) {
+            let html = '<div class="card" style="margin-top: 24px;"><h2>🎯 AI-Suggested Zones</h2>';
+            html += '<p style="color: #6b7280; margin-bottom: 20px;">Based on 90 days of price action analysis. Click "Add" to use these zones.</p>';
+            
+            if (detectedZones.supply.length > 0) {
+                html += '<h3 style="color: #ef4444; margin-top: 16px; margin-bottom: 12px;">🔴 Suggested Supply Zones (Resistance)</h3>';
+                
+                detectedZones.supply.forEach((zone, index) => {
+                    const quality = zone.confidence >= 70 ? '🔥 Strong' : zone.confidence >= 50 ? '✓ Good' : '⚠️ Moderate';
+                    const qualityColor = zone.confidence >= 70 ? '#10b981' : zone.confidence >= 50 ? '#f59e0b' : '#6b7280';
+                    
+                    html += `
+                        <div style="background: #fafafa; padding: 20px; margin-bottom: 12px; border-radius: 12px; border-left: 4px solid #ef4444;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #0d0d0d; margin-bottom: 4px;">
+                                        Zone: ${zone.top.toFixed(2)} - ${zone.bottom.toFixed(2)}
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #6b7280;">Formed: ${zone.date}</div>
+                                </div>
+                                <div style="font-weight: 600; color: ${qualityColor};">${quality}</div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Confidence</div>
+                                    <div style="font-weight: 600; color: #4f7cff; font-size: 1.2em;">${zone.confidence.toFixed(0)}%</div>
+                                </div>
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Tests</div>
+                                    <div style="font-weight: 600; font-size: 1.2em;">${zone.tests}</div>
+                                </div>
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Bounces</div>
+                                    <div style="font-weight: 600; font-size: 1.2em;">${zone.bounces}</div>
+                                </div>
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Success</div>
+                                    <div style="font-weight: 600; color: #10b981; font-size: 1.2em;">
+                                        ${zone.tests > 0 ? ((zone.bounces / zone.tests) * 100).toFixed(0) : 0}%
+                                    </div>
+                                </div>
+                            </div>
+                            <button onclick="addSuggestedZone('supply', ${zone.top}, ${zone.bottom})" 
+                                    style="background: #10b981; padding: 10px 20px; width: auto; margin: 0;">
+                                ✓ Add This Zone
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+            
+            if (detectedZones.demand.length > 0) {
+                html += '<h3 style="color: #10b981; margin-top: 24px; margin-bottom: 12px;">🟢 Suggested Demand Zones (Support)</h3>';
+                
+                detectedZones.demand.forEach((zone, index) => {
+                    const quality = zone.confidence >= 70 ? '🔥 Strong' : zone.confidence >= 50 ? '✓ Good' : '⚠️ Moderate';
+                    const qualityColor = zone.confidence >= 70 ? '#10b981' : zone.confidence >= 50 ? '#f59e0b' : '#6b7280';
+                    
+                    html += `
+                        <div style="background: #fafafa; padding: 20px; margin-bottom: 12px; border-radius: 12px; border-left: 4px solid #10b981;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <div>
+                                    <div style="font-weight: 600; color: #0d0d0d; margin-bottom: 4px;">
+                                        Zone: ${zone.top.toFixed(2)} - ${zone.bottom.toFixed(2)}
+                                    </div>
+                                    <div style="font-size: 0.85em; color: #6b7280;">Formed: ${zone.date}</div>
+                                </div>
+                                <div style="font-weight: 600; color: ${qualityColor};">${quality}</div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Confidence</div>
+                                    <div style="font-weight: 600; color: #4f7cff; font-size: 1.2em;">${zone.confidence.toFixed(0)}%</div>
+                                </div>
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Tests</div>
+                                    <div style="font-weight: 600; font-size: 1.2em;">${zone.tests}</div>
+                                </div>
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Bounces</div>
+                                    <div style="font-weight: 600; font-size: 1.2em;">${zone.bounces}</div>
+                                </div>
+                                <div style="background: white; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.8em; color: #6b7280;">Success</div>
+                                    <div style="font-weight: 600; color: #10b981; font-size: 1.2em;">
+                                        ${zone.tests > 0 ? ((zone.bounces / zone.tests) * 100).toFixed(0) : 0}%
+                                    </div>
+                                </div>
+                            </div>
+                            <button onclick="addSuggestedZone('demand', ${zone.top}, ${zone.bottom})" 
+                                    style="background: #10b981; padding: 10px 20px; width: auto; margin: 0;">
+                                ✓ Add This Zone
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += '<div style="background: #fffbeb; padding: 16px; border-radius: 12px; margin-top: 20px; border: 1px solid #fef3c7;">';
+            html += '<div style="font-weight: 600; color: #92400e; margin-bottom: 8px;">💡 How AI Zones Work</div>';
+            html += '<div style="font-size: 0.9em; color: #0d0d0d;">';
+            html += '<p style="margin-bottom: 8px;">• Analyzes 90 days of daily price action</p>';
+            html += '<p style="margin-bottom: 8px;">• Identifies swing highs/lows where price reversed</p>';
+            html += '<p style="margin-bottom: 8px;">• Tests zones against future price movement</p>';
+            html += '<p>• Ranks by confidence: tests + bounces + recency</p>';
+            html += '</div></div>';
+            
+            html += '<div style="margin-top: 16px; text-align: center;">';
+            html += '<button onclick="addAllSuggestedZones()" style="background: #4f7cff; width: auto; padding: 12px 24px;">Add All Strong Zones (70%+)</button>';
+            html += '</div>';
+            
+            html += '</div>';
+            
+            document.getElementById('historicalAnalysis').innerHTML = html;
+            
+            // Store for batch add
+            window.suggestedZonesData = detectedZones;
+        }
+        
+        function addSuggestedZone(type, top, bottom) {
+            zones[type].push({ top: top, bottom: bottom });
+            updateZoneList();
+            generateSignals();
+            saveAllData();
+            showSaveIndicator();
+            alert(`${type.toUpperCase()} zone added: ${bottom.toFixed(2)} - ${top.toFixed(2)}`);
+        }
+        
+        function addAllSuggestedZones() {
+            if (!window.suggestedZonesData) {
+                alert('No suggested zones available');
+                return;
+            }
+            
+            let added = 0;
+            
+            // Add supply zones with 70%+ confidence
+            window.suggestedZonesData.supply.forEach(zone => {
+                if (zone.confidence >= 70) {
+                    zones.supply.push({ top: zone.top, bottom: zone.bottom });
+                    added++;
+                }
+            });
+            
+            // Add demand zones with 70%+ confidence
+            window.suggestedZonesData.demand.forEach(zone => {
+                if (zone.confidence >= 70) {
+                    zones.demand.push({ top: zone.top, bottom: zone.bottom });
+                    added++;
+                }
+            });
+            
+            updateZoneList();
+            generateSignals();
+            saveAllData();
+            showSaveIndicator();
+            
+            alert(`Added ${added} high-confidence zones to your dashboard!`);
         }
         
         async function loadHistoricalData() {
@@ -1022,39 +1406,108 @@
             }
             
             let signals = [];
+            let nearbyZones = [];
             
+            // Check if price is IN a zone (active signal)
             zones.supply.forEach(zone => {
                 if (price >= zone.bottom && price <= zone.top) {
+                    // Calculate confidence based on conditions
+                    let confidence = 50; // Base confidence
+                    
+                    // Trend alignment
+                    if (trend === 'down') confidence += 20;
+                    if (trend === 'up') confidence -= 15;
+                    
+                    // Candle confirmation
+                    if (lastCandle === 'red') confidence += 20;
+                    else confidence -= 10;
+                    
+                    // Price position in zone (closer to top = better for puts)
+                    const zoneHeight = zone.top - zone.bottom;
+                    const pricePosition = (price - zone.bottom) / zoneHeight;
+                    if (pricePosition > 0.7) confidence += 10; // Near top of zone
+                    
+                    confidence = Math.max(0, Math.min(100, confidence));
+                    
                     signals.push({
                         type: 'put',
                         zone: zone,
-                        entry: 'POTENTIAL PUT ENTRY',
-                        condition: lastCandle === 'red' ? 'Strong Signal' : 'Wait for Reversal',
+                        entry: price,
+                        condition: lastCandle === 'red' ? 'Strong - Reversal Candle Present' : 'Weak - Wait for Red Candle',
                         stopLoss: zone.top + ((zone.top - zone.bottom) * 0.5),
                         takeProfit: findNextZone('down', price),
-                        trend: trend === 'down' ? 'With Trend ✓' : trend === 'up' ? 'Against Trend ⚠️' : 'Neutral'
+                        takeProfitPrice: findNextZonePrice('down', price),
+                        trend: trend === 'down' ? 'With Trend' : trend === 'up' ? 'Against Trend' : 'Neutral',
+                        confidence: confidence,
+                        recommendation: confidence >= 70 ? 'STRONG SIGNAL' : confidence >= 50 ? 'MODERATE SIGNAL' : 'WEAK SIGNAL'
                     });
                 }
             });
             
             zones.demand.forEach(zone => {
                 if (price >= zone.bottom && price <= zone.top) {
+                    let confidence = 50;
+                    
+                    if (trend === 'up') confidence += 20;
+                    if (trend === 'down') confidence -= 15;
+                    
+                    if (lastCandle === 'green') confidence += 20;
+                    else confidence -= 10;
+                    
+                    // Price position (closer to bottom = better for calls)
+                    const zoneHeight = zone.top - zone.bottom;
+                    const pricePosition = (price - zone.bottom) / zoneHeight;
+                    if (pricePosition < 0.3) confidence += 10;
+                    
+                    confidence = Math.max(0, Math.min(100, confidence));
+                    
                     signals.push({
                         type: 'call',
                         zone: zone,
-                        entry: 'POTENTIAL CALL ENTRY',
-                        condition: lastCandle === 'green' ? 'Strong Signal' : 'Wait for Reversal',
+                        entry: price,
+                        condition: lastCandle === 'green' ? 'Strong - Reversal Candle Present' : 'Weak - Wait for Green Candle',
                         stopLoss: zone.bottom - ((zone.top - zone.bottom) * 0.5),
                         takeProfit: findNextZone('up', price),
-                        trend: trend === 'up' ? 'With Trend ✓' : trend === 'down' ? 'Against Trend ⚠️' : 'Neutral'
+                        takeProfitPrice: findNextZonePrice('up', price),
+                        trend: trend === 'up' ? 'With Trend' : trend === 'down' ? 'Against Trend' : 'Neutral',
+                        confidence: confidence,
+                        recommendation: confidence >= 70 ? 'STRONG SIGNAL' : confidence >= 50 ? 'MODERATE SIGNAL' : 'WEAK SIGNAL'
                     });
                 }
             });
             
-            displaySignals(signals, price);
+            // Find nearby zones (within 5 points)
+            zones.supply.forEach(zone => {
+                const distance = zone.bottom - price;
+                if (distance > 0 && distance <= 5) {
+                    nearbyZones.push({
+                        type: 'supply',
+                        zone: zone,
+                        distance: distance,
+                        direction: 'above'
+                    });
+                }
+            });
+            
+            zones.demand.forEach(zone => {
+                const distance = price - zone.top;
+                if (distance > 0 && distance <= 5) {
+                    nearbyZones.push({
+                        type: 'demand',
+                        zone: zone,
+                        distance: distance,
+                        direction: 'below'
+                    });
+                }
+            });
+            
+            // Sort nearby zones by distance
+            nearbyZones.sort((a, b) => a.distance - b.distance);
+            
+            displaySignals(signals, nearbyZones, price);
         }
         
-        function findNextZone(direction, currentPrice) {
+        function findNextZonePrice(direction, currentPrice) {
             let targetZone = null;
             
             if (direction === 'up') {
@@ -1065,6 +1518,7 @@
                         }
                     }
                 });
+                return targetZone ? targetZone.bottom : null;
             } else {
                 zones.demand.forEach(zone => {
                     if (zone.top < currentPrice) {
@@ -1073,44 +1527,108 @@
                         }
                     }
                 });
+                return targetZone ? targetZone.top : null;
             }
-            
-            return targetZone ? `${targetZone.bottom.toFixed(2)} - ${targetZone.top.toFixed(2)}` : 'No zone';
         }
         
-        function displaySignals(signals, price) {
+        function displaySignals(signals, nearbyZones, price) {
             let html = '';
             
+            // Active signals
             if (signals.length === 0) {
                 html = `<div class="signal-item no-trade">
-                    <div class="signal-header">No Active Signals</div>
-                    <p style="color: #6b7280;">Price ${price.toFixed(2)} not in any zones. Wait for zone entry.</p>
+                    <div class="signal-header">⚠️ No Active Signals</div>
+                    <p style="color: #0d0d0d; margin-bottom: 16px; font-weight: 500;">
+                        Current Price: <strong>${price.toFixed(2)}</strong> - Not in any trade zones
+                    </p>
+                    <p style="color: #6b7280; margin-bottom: 8px;">Wait for price to enter a zone + reversal candle confirmation before taking a trade.</p>
                 </div>`;
             } else {
                 signals.forEach(signal => {
                     const className = signal.type === 'call' ? 'call' : 'put';
                     const emoji = signal.type === 'call' ? '🟢' : '🔴';
+                    const confidenceColor = signal.confidence >= 70 ? '#10b981' : signal.confidence >= 50 ? '#f59e0b' : '#ef4444';
+                    const riskReward = signal.takeProfitPrice ? 
+                        ((Math.abs(signal.takeProfitPrice - signal.entry) / Math.abs(signal.stopLoss - signal.entry))).toFixed(2) : 'N/A';
                     
-                    html += `<div class="signal-item ${className}">
-                        <div class="signal-header">${emoji} ${signal.entry}</div>
-                        <p style="color: #0d0d0d; margin-bottom: 8px;">Zone: ${signal.zone.bottom.toFixed(2)} - ${signal.zone.top.toFixed(2)}</p>
-                        <p style="color: #6b7280; font-size: 0.9em;">Status: ${signal.condition} • ${signal.trend}</p>
-                        <div class="signal-details">
+                    html += `<div class="signal-item ${className}" style="border-left-width: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <div class="signal-header" style="margin: 0;">${emoji} ${signal.recommendation}</div>
+                            <div style="background: ${confidenceColor}; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 1.1em;">
+                                ${signal.confidence}% CONFIDENCE
+                            </div>
+                        </div>
+                        
+                        <div style="background: white; padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+                            <div style="font-weight: 600; color: #0d0d0d; margin-bottom: 12px; font-size: 1.1em;">Trade Setup:</div>
+                            <div style="display: grid; gap: 8px; color: #0d0d0d;">
+                                <div>• <strong>Type:</strong> ${signal.type.toUpperCase()} Options (7 DTE, First ITM Strike)</div>
+                                <div>• <strong>Zone:</strong> ${signal.zone.bottom.toFixed(2)} - ${signal.zone.top.toFixed(2)}</div>
+                                <div>• <strong>Trend:</strong> ${signal.trend} ${signal.trend === 'With Trend' ? '✓' : signal.trend === 'Against Trend' ? '⚠️' : ''}</div>
+                                <div>• <strong>Candle Status:</strong> ${signal.condition}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="signal-details" style="grid-template-columns: repeat(4, 1fr);">
                             <div class="detail-item">
-                                <div class="detail-label">Entry</div>
-                                <div class="detail-value">${price.toFixed(2)}</div>
+                                <div class="detail-label">Entry Price</div>
+                                <div class="detail-value" style="color: #4f7cff;">${signal.entry.toFixed(2)}</div>
                             </div>
                             <div class="detail-item">
                                 <div class="detail-label">Stop Loss</div>
-                                <div class="detail-value">${signal.stopLoss.toFixed(2)}</div>
+                                <div class="detail-value" style="color: #ef4444;">${signal.stopLoss.toFixed(2)}</div>
                             </div>
                             <div class="detail-item">
                                 <div class="detail-label">Take Profit</div>
-                                <div class="detail-value">${signal.takeProfit}</div>
+                                <div class="detail-value" style="color: #10b981;">
+                                    ${signal.takeProfitPrice ? signal.takeProfitPrice.toFixed(2) : 'No zone'}
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Risk:Reward</div>
+                                <div class="detail-value" style="color: #10b981;">1:${riskReward}</div>
                             </div>
                         </div>
+                        
+                        ${signal.confidence < 70 ? `
+                            <div style="background: #fffbeb; padding: 12px; border-radius: 8px; margin-top: 16px; border: 1px solid #fef3c7;">
+                                <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">⚠️ Caution</div>
+                                <div style="font-size: 0.9em; color: #0d0d0d;">
+                                    ${signal.confidence < 50 ? 'Low confidence - Consider waiting for better setup' : 'Moderate confidence - Ensure strict risk management'}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>`;
                 });
+            }
+            
+            // Nearby zones to watch
+            if (nearbyZones.length > 0) {
+                html += '<div style="background: #dbeafe; padding: 20px; border-radius: 16px; margin-top: 16px; border-left: 4px solid #4f7cff;">';
+                html += '<div style="font-weight: 600; color: #1e40af; margin-bottom: 12px; font-size: 1.1em;">📍 Zones to Watch</div>';
+                html += '<div style="color: #0d0d0d;">';
+                
+                nearbyZones.slice(0, 3).forEach(nz => {
+                    const zoneType = nz.type === 'supply' ? 'PUT' : 'CALL';
+                    const emoji = nz.type === 'supply' ? '🔴' : '🟢';
+                    const setupType = nz.type === 'supply' ? 'Resistance' : 'Support';
+                    
+                    html += `
+                        <div style="background: white; padding: 14px; border-radius: 10px; margin-bottom: 10px;">
+                            <div style="font-weight: 600; margin-bottom: 6px;">
+                                ${emoji} ${zoneType} Setup ${nz.distance.toFixed(2)} points ${nz.direction}
+                            </div>
+                            <div style="font-size: 0.9em; color: #6b7280;">
+                                ${setupType} Zone: ${nz.zone.bottom.toFixed(2)} - ${nz.zone.top.toFixed(2)}
+                            </div>
+                            <div style="font-size: 0.85em; color: #4f7cff; margin-top: 4px;">
+                                Wait for: Price enters zone + ${nz.type === 'supply' ? 'red reversal candle' : 'green reversal candle'}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div></div>';
             }
             
             document.getElementById('signalContent').innerHTML = html;
