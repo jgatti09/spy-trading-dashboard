@@ -2748,6 +2748,102 @@
                 monthlyData[month].pl += trade.pl;
             });
             
+            // STORE DATA FIRST - before building HTML
+            window.backtestResultsData = {
+                summary: {
+                    totalTrades,
+                    winRate,
+                    avgWin,
+                    avgLoss,
+                    totalPL,
+                    avgRR,
+                    totalDays
+                },
+                byConfidence: {
+                    high: {
+                        trades: highConfTrades.length,
+                        winRate: highWinRate,
+                        winners: highConfTrades.filter(t => t.winner).length
+                    },
+                    medium: {
+                        trades: medConfTrades.length,
+                        winRate: medWinRate,
+                        winners: medConfTrades.filter(t => t.winner).length
+                    },
+                    low: {
+                        trades: lowConfTrades.length,
+                        winRate: lowWinRate,
+                        winners: lowConfTrades.filter(t => t.winner).length
+                    }
+                },
+                byType: {
+                    calls: {
+                        trades: callTrades.length,
+                        winRate: callWinRate,
+                        winners: callTrades.filter(t => t.winner).length
+                    },
+                    puts: {
+                        trades: putTrades.length,
+                        winRate: putWinRate,
+                        winners: putTrades.filter(t => t.winner).length
+                    }
+                },
+                exitReasons: {
+                    stopLoss: stopLossExits,
+                    takeProfit: takeProfitExits,
+                    timeExit: timeExits
+                },
+                monthlyPerformance: monthlyData,
+                allTrades: trades.map(t => ({
+                    type: t.type,
+                    entry: t.entry,
+                    exit: t.exitPrice,
+                    stopLoss: t.stopLoss,
+                    takeProfit: t.takeProfit,
+                    pl: t.pl,
+                    plPercent: t.plPercent,
+                    winner: t.winner,
+                    confidence: t.confidence,
+                    confidenceTier: t.confidenceTier,
+                    exitReason: t.exitReason,
+                    zone: t.zone,
+                    entryDate: t.entryDate.toISOString(),
+                    exitDate: t.exitDate.toISOString(),
+                    daysInTrade: t.exitIndex - t.entryIndex
+                })),
+                detectedZones: {
+                    supply: results.detectedZones.supply.map(z => ({
+                        top: z.top,
+                        bottom: z.bottom,
+                        confidence: z.confidence,
+                        tests: z.tests,
+                        bounces: z.bounces,
+                        date: z.date
+                    })),
+                    demand: results.detectedZones.demand.map(z => ({
+                        top: z.top,
+                        bottom: z.bottom,
+                        confidence: z.confidence,
+                        tests: z.tests,
+                        bounces: z.bounces,
+                        date: z.date
+                    }))
+                },
+                metadata: {
+                    backtestDate: new Date().toISOString(),
+                    dataSource: 'Polygon.io',
+                    timeframe: '2 years daily data',
+                    strategyRules: {
+                        entry: 'Price in zone + reversal candle + trend check',
+                        stopLoss: 'Zone edge + 50% zone width',
+                        takeProfit: 'Next zone level',
+                        timeExit: '7 days (simulating 7 DTE options)'
+                    }
+                }
+            };
+            
+            console.log('✓ Backtest data stored, ready for download:', window.backtestResultsData);
+            
             let html = '<div style="background: white; padding: 24px; border-radius: 16px; border: 1px solid #f0f0f0;">';
             html += '<h3 style="margin-bottom: 20px;">📊 Strategy Backtest Results (2 Years)</h3>';
             html += `<p style="color: #6b7280; margin-bottom: 24px;">Simulated ${totalTrades} trades across ${totalDays} trading days using detected supply/demand zones</p>`;
