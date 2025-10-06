@@ -431,8 +431,11 @@
                     <div class="input-group">
                         <label>Polygon.io API Key</label>
                         <div style="display: flex; gap: 12px;">
-                            <input type="password" id="polygonApiKey" placeholder="Enter your API key">
+                            <input type="text" id="polygonApiKey" placeholder="Enter your API key" autocomplete="off">
                             <button onclick="connectPolygon()" style="width: auto; margin: 0; padding: 12px 20px;">Connect</button>
+                        </div>
+                        <div style="font-size: 0.85em; color: #6b7280; margin-top: 8px;">
+                            Get your API key from <a href="https://polygon.io/dashboard/api-keys" target="_blank" style="color: #4f7cff;">Polygon.io Dashboard</a>
                         </div>
                     </div>
                     <div id="priceDisplay" style="margin-top: 12px; padding: 20px; background: #fafafa; border-radius: 12px;">
