@@ -839,10 +839,10 @@
             }
             
             const loadingDiv = document.getElementById('historicalAnalysis');
-            loadingDiv.innerHTML = '<div class="card"><h2>🎯 Analyzing Market Data...</h2><p style="color: #6b7280;">Using AI to detect supply and demand zones based on 90 days of price action...</p></div>';
+            loadingDiv.innerHTML = '<div class="card"><h2>🎯 Analyzing Market Data...</h2><p style="color: #6b7280;">Using AI to detect supply and demand zones based on 90 days of 4-hour price action...</p></div>';
             
             try {
-                // Get 90 days of daily data
+                // Get 90 days of 4-hour data (240 minute bars)
                 const to = new Date();
                 const from = new Date();
                 from.setDate(from.getDate() - 90);
@@ -851,7 +851,7 @@
                 const toStr = to.toISOString().split('T')[0];
                 
                 const response = await fetch(
-                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/1/day/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`
+                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/240/minute/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`
                 );
                 
                 if (!response.ok) {
@@ -1195,7 +1195,7 @@
             }
             
             const analysisDiv = document.getElementById('historicalAnalysis');
-            analysisDiv.innerHTML = '<div class="card"><h2>Loading Historical Data...</h2><p style="color: #6b7280;">Fetching 5 years of SPY data from Polygon.io...</p></div>';
+            analysisDiv.innerHTML = '<div class="card"><h2>Loading Historical Data...</h2><p style="color: #6b7280;">Fetching 5 years of 4-hour SPY data from Polygon.io...</p></div>';
             
             try {
                 const to = new Date();
@@ -1206,7 +1206,7 @@
                 const toStr = to.toISOString().split('T')[0];
                 
                 const response = await fetch(
-                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/1/day/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`
+                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/240/minute/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`
                 );
                 
                 if (!response.ok) {
@@ -2274,8 +2274,8 @@
                 <div style="font-size: 1.8em; font-weight: 700; color: #f59e0b;">${avgSupplyFalseBreaks.toFixed(1)}</div>
             </div>`;
             html += `<div style="background: white; padding: 16px; border-radius: 8px;">
-                <div style="font-size: 0.85em; color: #6b7280;">Days to First Retest</div>
-                <div style="font-size: 1.8em; font-weight: 700; color: #4f7cff;">${avgDaysToSupplyRetest.toFixed(0)}</div>
+                <div style="font-size: 0.85em; color: #6b7280;">4H Bars to First Retest</div>
+                <div style="font-size: 1.8em; font-weight: 700; color: #4f7cff;">${avgBarsToSupplyRetest.toFixed(0)}</div>
             </div>`;
             html += `<div style="background: white; padding: 16px; border-radius: 8px;">
                 <div style="font-size: 0.85em; color: #6b7280;">Bounce Success Rate</div>
