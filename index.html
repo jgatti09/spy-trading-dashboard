@@ -2326,7 +2326,127 @@
             
             html += '</div>';
             
+            // Add download button
+            html += '<div style="margin-top: 24px; text-align: center;">';
+            html += '<button onclick="downloadBacktestResults()" style="background: #10b981; padding: 14px 28px; font-size: 1.05em; width: auto;">📥 Download Results as JSON</button>';
+            html += '</div>';
+            
             document.getElementById('backtestResults').innerHTML = html;
+            
+            // Store results globally for download
+            window.backtestResultsData = {
+                summary: {
+                    totalTrades,
+                    winRate,
+                    avgWin,
+                    avgLoss,
+                    totalPL,
+                    avgRR,
+                    totalDays
+                },
+                byConfidence: {
+                    high: {
+                        trades: highConfTrades.length,
+                        winRate: highWinRate,
+                        winners: highConfTrades.filter(t => t.winner).length
+                    },
+                    medium: {
+                        trades: medConfTrades.length,
+                        winRate: medWinRate,
+                        winners: medConfTrades.filter(t => t.winner).length
+                    },
+                    low: {
+                        trades: lowConfTrades.length,
+                        winRate: lowWinRate,
+                        winners: lowConfTrades.filter(t => t.winner).length
+                    }
+                },
+                byType: {
+                    calls: {
+                        trades: callTrades.length,
+                        winRate: callWinRate,
+                        winners: callTrades.filter(t => t.winner).length
+                    },
+                    puts: {
+                        trades: putTrades.length,
+                        winRate: putWinRate,
+                        winners: putTrades.filter(t => t.winner).length
+                    }
+                },
+                exitReasons: {
+                    stopLoss: stopLossExits,
+                    takeProfit: takeProfitExits,
+                    timeExit: timeExits
+                },
+                monthlyPerformance: monthlyData,
+                allTrades: trades.map(t => ({
+                    type: t.type,
+                    entry: t.entry,
+                    exit: t.exitPrice,
+                    stopLoss: t.stopLoss,
+                    takeProfit: t.takeProfit,
+                    pl: t.pl,
+                    plPercent: t.plPercent,
+                    winner: t.winner,
+                    confidence: t.confidence,
+                    confidenceTier: t.confidenceTier,
+                    exitReason: t.exitReason,
+                    zone: t.zone,
+                    entryDate: t.entryDate.toISOString(),
+                    exitDate: t.exitDate.toISOString(),
+                    daysInTrade: t.exitIndex - t.entryIndex
+                })),
+                detectedZones: {
+                    supply: results.detectedZones.supply.map(z => ({
+                        top: z.top,
+                        bottom: z.bottom,
+                        confidence: z.confidence,
+                        tests: z.tests,
+                        bounces: z.bounces,
+                        date: z.date
+                    })),
+                    demand: results.detectedZones.demand.map(z => ({
+                        top: z.top,
+                        bottom: z.bottom,
+                        confidence: z.confidence,
+                        tests: z.tests,
+                        bounces: z.bounces,
+                        date: z.date
+                    }))
+                },
+                metadata: {
+                    backtestDate: new Date().toISOString(),
+                    dataSource: 'Polygon.io',
+                    timeframe: '2 years daily data',
+                    strategyRules: {
+                        entry: 'Price in zone + reversal candle + trend check',
+                        stopLoss: 'Zone edge + 50% zone width',
+                        takeProfit: 'Next zone level',
+                        timeExit: '7 days (simulating 7 DTE options)'
+                    }
+                }
+            };
+        }
+        
+        function downloadBacktestResults() {
+            if (!window.backtestResultsData) {
+                alert('No backtest results available. Please run a backtest first.');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(window.backtestResultsData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `spy-backtest-results-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            alert('✓ Backtest results downloaded! Upload this file to Claude to analyze and refine your strategy.');
         }
         
         async function runStrategyBacktest() {
