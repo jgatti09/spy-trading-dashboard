@@ -2367,10 +2367,7 @@
                     avgLoss,
                     totalPL,
                     avgRR,
-                    totalDays,
-                    totalPL_100Shares,
-                    avgWin_100Shares,
-                    avgLoss_100Shares
+                    totalDays
                 },
                 byConfidence: {
                     high: {
@@ -2509,21 +2506,11 @@
                 return;
             }
             
-            // Validate parameters exist
-            const stopLossBufferEl = document.getElementById('stopLossBuffer');
-            const takeProfitStyleEl = document.getElementById('takeProfitStyle');
-            const minConfidenceEl = document.getElementById('minConfidence');
-            
-            if (!stopLossBufferEl || !takeProfitStyleEl || !minConfidenceEl) {
-                alert('Error: Backtest parameter controls not found. Please refresh the page.');
-                return;
-            }
-            
             const resultsDiv = document.getElementById('backtestResults');
             resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;"><h3>🎯 Running Strategy Backtest...</h3><p style="color: #6b7280;">Loading 2 years of 4-hour candle data and simulating trades with your exact rules...</p><p style="color: #6b7280; margin-top: 12px;">This will take 30-60 seconds</p></div>';
             
             try {
-                // Get 2 years of 4H data
+                // Get 2 years of data - we'll use daily bars and simulate 4H behavior
                 const to = new Date();
                 const from = new Date();
                 from.setFullYear(from.getFullYear() - 2);
@@ -2555,8 +2542,7 @@
                 displayBacktestResults(backtestResults, data.results.length);
                 
             } catch (error) {
-                console.error('Backtest error:', error);
-                resultsDiv.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;"><h3>Error: ${error.message}</h3><p style="margin-top: 12px; color: #6b7280;">Check console for details</p></div>`;
+                resultsDiv.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;"><h3>Error: ${error.message}</h3></div>`;
             }
         }
         
@@ -2714,83 +2700,57 @@
                                 }
                             }
                             
-                            // Only take trades with minimum confidence
-                            if (validEntry && confidence >= minConfidenceThreshold) {
-                                // Calculate stop loss with configurable buffer
+                            // V02: Only take trades with 75%+ confidence
+                            if (validEntry && confidence >= 75) {
+                                // V02: Calculate stop loss with 75% zone width (was 50%)
                                 const zoneWidth = zone.top - zone.bottom;
                                 const stopLoss = zone.type === 'supply' ? 
-                                    zone.top + (zoneWidth * stopLossBufferPercent) : 
-                                    zone.bottom - (zoneWidth * stopLossBufferPercent);
+                                    zone.top + (zoneWidth * 0.75) : 
+                                    zone.bottom - (zoneWidth * 0.75);
                                 
                                 // Calculate risk distance
                                 const riskDistance = Math.abs(entryPrice - stopLoss);
                                 
-                                // Calculate take profit based on style
+                                // V02: Find take profit using 1.5R or 50% to next zone (whichever closer)
                                 let takeProfit = null;
                                 let targetFromRR = null;
                                 let targetFromZone = null;
                                 
-                                if (takeProfitStyle === '1.5R') {
-                                    // Simple 1.5R fixed
-                                    if (zone.type === 'supply') {
-                                        takeProfit = entryPrice - (riskDistance * 1.5);
-                                    } else {
-                                        takeProfit = entryPrice + (riskDistance * 1.5);
-                                    }
-                                } else if (takeProfitStyle === '2R') {
-                                    // Simple 2R fixed
-                                    if (zone.type === 'supply') {
-                                        takeProfit = entryPrice - (riskDistance * 2);
-                                    } else {
-                                        takeProfit = entryPrice + (riskDistance * 2);
-                                    }
-                                } else if (takeProfitStyle === 'next_zone') {
-                                    // Next zone level only
-                                    if (zone.type === 'supply') {
-                                        const lowerZones = allZones
-                                            .filter(z => z.type === 'demand' && z.top < entryPrice && !disabledZones.has(z.id))
-                                            .sort((a, b) => b.top - a.top);
-                                        if (lowerZones.length > 0) {
-                                            takeProfit = lowerZones[0].top;
-                                        }
-                                    } else {
-                                        const upperZones = allZones
-                                            .filter(z => z.type === 'supply' && z.bottom > entryPrice && !disabledZones.has(z.id))
-                                            .sort((a, b) => a.bottom - b.bottom);
-                                        if (upperZones.length > 0) {
-                                            takeProfit = upperZones[0].bottom;
-                                        }
+                                // Calculate 1.5R target
+                                if (zone.type === 'supply') {
+                                    targetFromRR = entryPrice - (riskDistance * 1.5);
+                                } else {
+                                    targetFromRR = entryPrice + (riskDistance * 1.5);
+                                }
+                                
+                                // Find next zone and calculate 50% target
+                                if (zone.type === 'supply') {
+                                    // Look for demand zone below
+                                    const lowerZones = allZones
+                                        .filter(z => z.type === 'demand' && z.top < entryPrice && !disabledZones.has(z.id))
+                                        .sort((a, b) => b.top - a.top);
+                                    if (lowerZones.length > 0) {
+                                        const distanceToZone = entryPrice - lowerZones[0].top;
+                                        targetFromZone = entryPrice - (distanceToZone * 0.5);
                                     }
                                 } else {
-                                    // Hybrid: 1.5R or 50% to next zone (whichever closer)
-                                    if (zone.type === 'supply') {
-                                        targetFromRR = entryPrice - (riskDistance * 1.5);
-                                        const lowerZones = allZones
-                                            .filter(z => z.type === 'demand' && z.top < entryPrice && !disabledZones.has(z.id))
-                                            .sort((a, b) => b.top - a.top);
-                                        if (lowerZones.length > 0) {
-                                            const distanceToZone = entryPrice - lowerZones[0].top;
-                                            targetFromZone = entryPrice - (distanceToZone * 0.5);
-                                        }
-                                    } else {
-                                        targetFromRR = entryPrice + (riskDistance * 1.5);
-                                        const upperZones = allZones
-                                            .filter(z => z.type === 'supply' && z.bottom > entryPrice && !disabledZones.has(z.id))
-                                            .sort((a, b) => a.bottom - b.bottom);
-                                        if (upperZones.length > 0) {
-                                            const distanceToZone = upperZones[0].bottom - entryPrice;
-                                            targetFromZone = entryPrice + (distanceToZone * 0.5);
-                                        }
+                                    // Look for supply zone above
+                                    const upperZones = allZones
+                                        .filter(z => z.type === 'supply' && z.bottom > entryPrice && !disabledZones.has(z.id))
+                                        .sort((a, b) => a.bottom - b.bottom);
+                                    if (upperZones.length > 0) {
+                                        const distanceToZone = upperZones[0].bottom - entryPrice;
+                                        targetFromZone = entryPrice + (distanceToZone * 0.5);
                                     }
-                                    
-                                    // Choose closer target
-                                    if (targetFromRR && targetFromZone) {
-                                        const distRR = Math.abs(targetFromRR - entryPrice);
-                                        const distZone = Math.abs(targetFromZone - entryPrice);
-                                        takeProfit = distRR < distZone ? targetFromRR : targetFromZone;
-                                    } else {
-                                        takeProfit = targetFromRR || targetFromZone;
-                                    }
+                                }
+                                
+                                // Choose closer target
+                                if (targetFromRR && targetFromZone) {
+                                    const distRR = Math.abs(targetFromRR - entryPrice);
+                                    const distZone = Math.abs(targetFromZone - entryPrice);
+                                    takeProfit = distRR < distZone ? targetFromRR : targetFromZone;
+                                } else {
+                                    takeProfit = targetFromRR || targetFromZone;
                                 }
                                 
                                 // Create position
@@ -2817,12 +2777,7 @@
             return {
                 trades,
                 detectedZones,
-                disabledZones: Array.from(disabledZones),
-                backtestParams: {
-                    stopLossBuffer: stopLossBufferPercent,
-                    takeProfitStyle: takeProfitStyle,
-                    minConfidence: minConfidenceThreshold
-                }
+                disabledZones: Array.from(disabledZones)
             };
         }
         
@@ -2830,7 +2785,6 @@
             const trades = results.trades;
             const winners = trades.filter(t => t.winner);
             const losers = trades.filter(t => !t.winner);
-            const params = results.backtestParams;
             
             // Overall stats
             const totalTrades = trades.length;
@@ -2839,11 +2793,6 @@
             const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((sum, t) => sum + t.pl, 0) / losers.length) : 0;
             const totalPL = trades.reduce((sum, t) => sum + t.pl, 0);
             const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
-            
-            // Calculate SPY share P&L (100 shares per trade)
-            const totalPL_100Shares = totalPL * 100;
-            const avgWin_100Shares = avgWin * 100;
-            const avgLoss_100Shares = avgLoss * 100;
             
             // By confidence tier
             const highConfTrades = trades.filter(t => t.confidenceTier === 'high');
@@ -2967,17 +2916,10 @@
                     dataSource: 'Polygon.io',
                     timeframe: '2 years of 4-hour bar data',
                     strategyRules: {
-                        entry: `Price in zone + reversal candle + ${params.minConfidence}%+ confidence`,
-                        stopLoss: `Zone edge + ${(params.stopLossBuffer * 100).toFixed(0)}% zone width`,
-                        takeProfit: params.takeProfitStyle === 'next_zone' ? 'Next zone level' : 
-                                   params.takeProfitStyle === '1.5R' ? '1.5R fixed' :
-                                   params.takeProfitStyle === '2R' ? '2R fixed' : '1.5R or 50% to zone (closer)',
+                        entry: 'Price in zone + reversal candle + trend check',
+                        stopLoss: 'Zone edge + 50% zone width',
+                        takeProfit: 'Next zone level',
                         timeExit: '7 days (simulating 7 DTE options)'
-                    },
-                    parameters: {
-                        stopLossBuffer: params.stopLossBuffer,
-                        takeProfitStyle: params.takeProfitStyle,
-                        minConfidence: params.minConfidence
                     }
                 }
             };
@@ -2991,7 +2933,7 @@
             // Overall performance
             html += '<div style="background: #dbeafe; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #4f7cff;">';
             html += '<h4 style="color: #1e40af; margin-bottom: 16px;">Overall Performance</h4>';
-            html += '<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;">';
+            html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">';
             
             html += `<div style="background: white; padding: 16px; border-radius: 8px;">
                 <div style="font-size: 0.85em; color: #6b7280;">Total Trades</div>
@@ -3009,30 +2951,11 @@
             </div>`;
             
             html += `<div style="background: white; padding: 16px; border-radius: 8px;">
-                <div style="font-size: 0.85em; color: #6b7280;">Total P&L (pts)</div>
+                <div style="font-size: 0.85em; color: #6b7280;">Total P&L</div>
                 <div style="font-size: 1.8em; font-weight: 700; color: ${totalPL >= 0 ? '#10b981' : '#ef4444'};">${totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)}</div>
             </div>`;
             
-            html += `<div style="background: white; padding: 16px; border-radius: 8px;">
-                <div style="font-size: 0.85em; color: #6b7280;">P&L (100 shares)</div>
-                <div style="font-size: 1.8em; font-weight: 700; color: ${totalPL_100Shares >= 0 ? '#10b981' : '#ef4444'};">${totalPL_100Shares >= 0 ? '+' : ''}${totalPL_100Shares.toFixed(0)}</div>
-            </div>`;
-            
-            html += '</div>';
-            
-            // Add average win/loss in dollars
-            html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px;">';
-            html += `<div style="background: #f0fdf4; padding: 16px; border-radius: 8px; border: 1px solid #d1fae5;">
-                <div style="font-size: 0.85em; color: #065f46; font-weight: 500;">Avg Win (100 shares)</div>
-                <div style="font-size: 1.5em; font-weight: 700; color: #10b981;">+${avgWin_100Shares.toFixed(2)}</div>
-            </div>`;
-            html += `<div style="background: #fef2f2; padding: 16px; border-radius: 8px; border: 1px solid #fecaca;">
-                <div style="font-size: 0.85em; color: #991b1b; font-weight: 500;">Avg Loss (100 shares)</div>
-                <div style="font-size: 1.5em; font-weight: 700; color: #ef4444;">-${avgLoss_100Shares.toFixed(2)}</div>
-            </div>`;
-            html += '</div>';
-            
-            html += '</div>';
+            html += '</div></div>';
             
             // By confidence level
             html += '<div style="background: #fffbeb; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">';
