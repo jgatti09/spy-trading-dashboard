@@ -2421,11 +2421,21 @@
                     backtestDate: new Date().toISOString(),
                     dataSource: 'Polygon.io',
                     timeframe: '2 years daily data',
+                    strategyVersion: 'V02',
                     strategyRules: {
-                        entry: 'Price in zone + reversal candle + trend check',
-                        stopLoss: 'Zone edge + 50% zone width',
-                        takeProfit: 'Next zone level',
-                        timeExit: '7 days (simulating 7 DTE options)'
+                        entry: 'Price in zone + reversal candle + 75%+ confidence',
+                        stopLoss: 'Zone edge + 75% zone width',
+                        takeProfit: '1.5R or 50% to next zone (whichever closer)',
+                        timeExit: '7 days (simulating 7 DTE options)',
+                        zoneManagement: 'Delete zone after 2 stop losses'
+                    },
+                    changes: {
+                        v01_to_v02: [
+                            'Widened stops from 50% to 75% zone width',
+                            'Raised confidence threshold from 70% to 75%',
+                            'Changed profit target from next zone to 1.5R or 50% to zone',
+                            'Added zone management: disable after 2 stop losses'
+                        ]
                     }
                 }
             };
@@ -2517,12 +2527,19 @@
         function simulateTrades(candles, detectedZones) {
             const trades = [];
             let activePosition = null;
+            const zoneStopLossCount = {}; // Track stop losses per zone
+            const disabledZones = new Set(); // Zones that hit 2 stop losses
             
             // Combine all zones
             const allZones = [
-                ...detectedZones.supply.map(z => ({ ...z, type: 'supply' })),
-                ...detectedZones.demand.map(z => ({ ...z, type: 'demand' }))
+                ...detectedZones.supply.map(z => ({ ...z, type: 'supply', id: `supply_${z.bottom}_${z.top}` })),
+                ...detectedZones.demand.map(z => ({ ...z, type: 'demand', id: `demand_${z.bottom}_${z.top}` }))
             ];
+            
+            // Initialize stop loss counters
+            allZones.forEach(zone => {
+                zoneStopLossCount[zone.id] = 0;
+            });
             
             // Simulate each day
             for (let i = 5; i < candles.length; i++) {
@@ -2566,6 +2583,18 @@
                             exitPrice - activePosition.entry : 
                             activePosition.entry - exitPrice;
                         
+                        const winner = pl > 0;
+                        
+                        // Track zone stop losses
+                        if (exitReason === 'stop_loss' && !winner) {
+                            zoneStopLossCount[activePosition.zoneId]++;
+                            
+                            // Disable zone if it hit 2 stop losses
+                            if (zoneStopLossCount[activePosition.zoneId] >= 2) {
+                                disabledZones.add(activePosition.zoneId);
+                            }
+                        }
+                        
                         trades.push({
                             ...activePosition,
                             exitPrice,
@@ -2574,7 +2603,7 @@
                             exitDate: new Date(candle.t),
                             pl,
                             plPercent: (pl / Math.abs(activePosition.entry - activePosition.stopLoss)) * 100,
-                            winner: pl > 0
+                            winner
                         });
                         
                         activePosition = null;
@@ -2584,6 +2613,9 @@
                 // Look for new trade entries (only if no active position)
                 if (!activePosition) {
                     for (const zone of allZones) {
+                        // Skip disabled zones
+                        if (disabledZones.has(zone.id)) continue;
+                        
                         // Check if price entered the zone
                         const inZone = candle.h >= zone.bottom && candle.l <= zone.top;
                         
@@ -2646,31 +2678,57 @@
                                 }
                             }
                             
-                            if (validEntry) {
-                                // Calculate stop loss
+                            // V02: Only take trades with 75%+ confidence
+                            if (validEntry && confidence >= 75) {
+                                // V02: Calculate stop loss with 75% zone width (was 50%)
                                 const zoneWidth = zone.top - zone.bottom;
                                 const stopLoss = zone.type === 'supply' ? 
-                                    zone.top + (zoneWidth * 0.5) : 
-                                    zone.bottom - (zoneWidth * 0.5);
+                                    zone.top + (zoneWidth * 0.75) : 
+                                    zone.bottom - (zoneWidth * 0.75);
                                 
-                                // Find take profit (next zone)
+                                // Calculate risk distance
+                                const riskDistance = Math.abs(entryPrice - stopLoss);
+                                
+                                // V02: Find take profit using 1.5R or 50% to next zone (whichever closer)
                                 let takeProfit = null;
+                                let targetFromRR = null;
+                                let targetFromZone = null;
+                                
+                                // Calculate 1.5R target
+                                if (zone.type === 'supply') {
+                                    targetFromRR = entryPrice - (riskDistance * 1.5);
+                                } else {
+                                    targetFromRR = entryPrice + (riskDistance * 1.5);
+                                }
+                                
+                                // Find next zone and calculate 50% target
                                 if (zone.type === 'supply') {
                                     // Look for demand zone below
                                     const lowerZones = allZones
-                                        .filter(z => z.type === 'demand' && z.top < entryPrice)
+                                        .filter(z => z.type === 'demand' && z.top < entryPrice && !disabledZones.has(z.id))
                                         .sort((a, b) => b.top - a.top);
                                     if (lowerZones.length > 0) {
-                                        takeProfit = lowerZones[0].top;
+                                        const distanceToZone = entryPrice - lowerZones[0].top;
+                                        targetFromZone = entryPrice - (distanceToZone * 0.5);
                                     }
                                 } else {
                                     // Look for supply zone above
                                     const upperZones = allZones
-                                        .filter(z => z.type === 'supply' && z.bottom > entryPrice)
+                                        .filter(z => z.type === 'supply' && z.bottom > entryPrice && !disabledZones.has(z.id))
                                         .sort((a, b) => a.bottom - b.bottom);
                                     if (upperZones.length > 0) {
-                                        takeProfit = upperZones[0].bottom;
+                                        const distanceToZone = upperZones[0].bottom - entryPrice;
+                                        targetFromZone = entryPrice + (distanceToZone * 0.5);
                                     }
+                                }
+                                
+                                // Choose closer target
+                                if (targetFromRR && targetFromZone) {
+                                    const distRR = Math.abs(targetFromRR - entryPrice);
+                                    const distZone = Math.abs(targetFromZone - entryPrice);
+                                    takeProfit = distRR < distZone ? targetFromRR : targetFromZone;
+                                } else {
+                                    takeProfit = targetFromRR || targetFromZone;
                                 }
                                 
                                 // Create position
@@ -2682,8 +2740,9 @@
                                     entryIndex: i,
                                     entryDate: new Date(candle.t),
                                     zone: `${zone.bottom.toFixed(2)}-${zone.top.toFixed(2)}`,
+                                    zoneId: zone.id,
                                     confidence,
-                                    confidenceTier: confidence >= 70 ? 'high' : confidence >= 50 ? 'medium' : 'low'
+                                    confidenceTier: confidence >= 75 ? 'high' : confidence >= 50 ? 'medium' : 'low'
                                 };
                                 
                                 break; // Only one trade at a time
@@ -2695,7 +2754,8 @@
             
             return {
                 trades,
-                detectedZones
+                detectedZones,
+                disabledZones: Array.from(disabledZones)
             };
         }
         
