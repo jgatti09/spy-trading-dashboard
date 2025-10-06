@@ -2817,7 +2817,12 @@
             return {
                 trades,
                 detectedZones,
-                disabledZones: Array.from(disabledZones)
+                disabledZones: Array.from(disabledZones),
+                backtestParams: {
+                    stopLossBuffer: stopLossBufferPercent,
+                    takeProfitStyle: takeProfitStyle,
+                    minConfidence: minConfidenceThreshold
+                }
             };
         }
         
@@ -2825,6 +2830,7 @@
             const trades = results.trades;
             const winners = trades.filter(t => t.winner);
             const losers = trades.filter(t => !t.winner);
+            const params = results.backtestParams;
             
             // Overall stats
             const totalTrades = trades.length;
@@ -2961,17 +2967,17 @@
                     dataSource: 'Polygon.io',
                     timeframe: '2 years of 4-hour bar data',
                     strategyRules: {
-                        entry: `Price in zone + reversal candle + ${minConfidenceThreshold}%+ confidence`,
-                        stopLoss: `Zone edge + ${(stopLossBufferPercent * 100).toFixed(0)}% zone width`,
-                        takeProfit: takeProfitStyle === 'next_zone' ? 'Next zone level' : 
-                                   takeProfitStyle === '1.5R' ? '1.5R fixed' :
-                                   takeProfitStyle === '2R' ? '2R fixed' : '1.5R or 50% to zone (closer)',
+                        entry: `Price in zone + reversal candle + ${params.minConfidence}%+ confidence`,
+                        stopLoss: `Zone edge + ${(params.stopLossBuffer * 100).toFixed(0)}% zone width`,
+                        takeProfit: params.takeProfitStyle === 'next_zone' ? 'Next zone level' : 
+                                   params.takeProfitStyle === '1.5R' ? '1.5R fixed' :
+                                   params.takeProfitStyle === '2R' ? '2R fixed' : '1.5R or 50% to zone (closer)',
                         timeExit: '7 days (simulating 7 DTE options)'
                     },
                     parameters: {
-                        stopLossBuffer: stopLossBufferPercent,
-                        takeProfitStyle: takeProfitStyle,
-                        minConfidence: minConfidenceThreshold
+                        stopLossBuffer: params.stopLossBuffer,
+                        takeProfitStyle: params.takeProfitStyle,
+                        minConfidence: params.minConfidence
                     }
                 }
             };
