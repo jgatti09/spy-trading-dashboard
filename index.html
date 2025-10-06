@@ -382,6 +382,7 @@
         
         <div class="last-updated" id="lastUpdated">Loading...</div>
         
+        <!-- DASHBOARD PAGE -->
         <div id="dashboardPage" class="page active">
             <div class="signals" id="topSignals" style="margin-bottom: 24px;">
                 <h2 style="color: #0d0d0d; margin-bottom: 20px; font-weight: 600;">Trade Signals & Alerts</h2>
@@ -486,17 +487,131 @@
             </div>
         </div>
         
+        <!-- TRADE LOG PAGE -->
         <div id="tradelogPage" class="page">
             <div class="card">
-                <h2>Trade Log - Coming Soon</h2>
-                <p style="color: #6b7280;">Track your trades and performance here.</p>
+                <h2>Trade Log</h2>
+                <p style="color: #6b7280; margin-bottom: 20px;">Track your trades and analyze performance.</p>
+                
+                <div style="background: #fafafa; padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 16px;">Log New Trade</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                        <div class="input-group" style="margin: 0;">
+                            <label>Trade Type</label>
+                            <select id="logTradeType">
+                                <option value="call">CALL</option>
+                                <option value="put">PUT</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Zone</label>
+                            <input type="text" id="logZone" placeholder="658-663">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Entry Date/Time</label>
+                            <input type="datetime-local" id="logEntryDateTime">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Entry Price</label>
+                            <input type="number" id="logEntryPrice" step="0.01" placeholder="659.50">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Entry Contract Price</label>
+                            <input type="number" id="logEntryContractPrice" step="0.01" placeholder="4.50">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Contracts</label>
+                            <input type="number" id="logContracts" placeholder="1">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Exit Date/Time</label>
+                            <input type="datetime-local" id="logExitDateTime">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Exit Price</label>
+                            <input type="number" id="logExitPrice" step="0.01" placeholder="663.00">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Exit Contract Price</label>
+                            <input type="number" id="logExitContractPrice" step="0.01" placeholder="7.80">
+                        </div>
+                    </div>
+                    <button onclick="logTrade()">Log Trade</button>
+                </div>
+                
+                <div id="tradeLogList"></div>
             </div>
         </div>
         
+        <!-- WEEKLY RECAP PAGE -->
         <div id="weeklyPage" class="page">
             <div class="card">
-                <h2>Weekly Recap - Coming Soon</h2>
-                <p style="color: #6b7280;">View weekly performance summaries here.</p>
+                <h2>Weekly Recap</h2>
+                <p style="color: #6b7280; margin-bottom: 20px;">Track your weekly performance and key observations.</p>
+                
+                <div class="input-group">
+                    <label>Week Starting</label>
+                    <input type="date" id="weekDate">
+                </div>
+                
+                <div style="background: #f0fdf4; padding: 20px; border-radius: 16px; margin: 20px 0; border: 1px solid #d1fae5;">
+                    <h3 style="color: #065f46; margin-bottom: 16px;">Log Winning Trades</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                        <div class="input-group" style="margin: 0;">
+                            <label>Trade Type</label>
+                            <select id="weeklyTradeType">
+                                <option value="CALL">CALL</option>
+                                <option value="PUT">PUT</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Zone</label>
+                            <input type="text" id="weeklyZone" placeholder="658-663">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Entry Date/Time</label>
+                            <input type="datetime-local" id="weeklyEntryDateTime">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Entry Price</label>
+                            <input type="number" id="weeklyEntryPrice" step="0.01">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Exit Date/Time</label>
+                            <input type="datetime-local" id="weeklyExitDateTime">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Exit Price</label>
+                            <input type="number" id="weeklyExitPrice" step="0.01">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Entry Contract Price</label>
+                            <input type="number" id="weeklyEntryContractPrice" step="0.01">
+                        </div>
+                        <div class="input-group" style="margin: 0;">
+                            <label>Exit Contract Price</label>
+                            <input type="number" id="weeklyExitContractPrice" step="0.01">
+                        </div>
+                    </div>
+                    <button onclick="addWeeklyTrade()" style="background: #10b981;">Add Trade</button>
+                    <div id="weeklyTradesList" style="margin-top: 16px;"></div>
+                </div>
+                
+                <div style="background: #fffbeb; padding: 20px; border-radius: 16px; margin: 20px 0; border: 1px solid #fef3c7;">
+                    <h3 style="color: #92400e; margin-bottom: 16px;">Pattern Analysis</h3>
+                    <div id="patternAnalysis">
+                        <p>Add winning trades to see pattern analysis.</p>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label>Key Observations</label>
+                    <textarea id="weeklyNotes" style="min-height: 100px;" placeholder="Enter key observations from your instructor..."></textarea>
+                </div>
+                
+                <button onclick="saveWeeklyRecap()">Save Recap</button>
+                
+                <div id="recapHistory" style="margin-top: 20px;"></div>
             </div>
         </div>
     </div>
@@ -513,7 +628,6 @@
         
         async function connectPolygon() {
             const apiKey = document.getElementById('polygonApiKey').value.trim();
-            
             if (!apiKey) {
                 alert('Please enter your Polygon.io API key');
                 return;
@@ -725,7 +839,7 @@
                     const quality = test.successRate >= 70 ? '🔥 Strong' : test.successRate >= 50 ? '✓ Good' : '⚠️ Weak';
                     html += `
                         <div style="background: #fafafa; padding: 20px; margin-bottom: 12px; border-radius: 12px;">
-                            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                                 <div style="font-weight: 600; color: #0d0d0d;">Zone: ${test.zone.bottom.toFixed(2)} - ${test.zone.top.toFixed(2)}</div>
                                 <div style="font-weight: 600; color: ${test.successRate >= 70 ? '#10b981' : test.successRate >= 50 ? '#f59e0b' : '#ef4444'};">${quality}</div>
                             </div>
@@ -808,6 +922,10 @@
                 updateZoneList();
                 generateSignals();
                 updateStats();
+                displayWeeklyTrades();
+                updatePatternAnalysis();
+                displayRecapHistory();
+                displayTradeLogs();
             } catch (error) {
                 console.error('Error loading:', error);
             }
@@ -999,9 +1117,325 @@
         }
         
         function updateStats() {
-            document.getElementById('totalTrades').textContent = '0';
-            document.getElementById('winRate').textContent = '0%';
-            document.getElementById('totalPL').textContent = '$0';
+            const trades = JSON.parse(localStorage.getItem('tradeLogs') || '[]');
+            const closed = trades.filter(t => t.exitPrice);
+            const winners = closed.filter(t => {
+                const pl = (t.exitContractPrice - t.entryContractPrice) * 100 * (t.contracts || 1);
+                return pl > 0;
+            }).length;
+            const totalPL = closed.reduce((sum, t) => {
+                return sum + ((t.exitContractPrice - t.entryContractPrice) * 100 * (t.contracts || 1));
+            }, 0);
+            
+            document.getElementById('totalTrades').textContent = closed.length;
+            document.getElementById('winRate').textContent = closed.length ? 
+                ((winners / closed.length) * 100).toFixed(1) + '%' : '0%';
+            document.getElementById('totalPL').textContent = '$' + totalPL.toFixed(2);
+        }
+        
+        function logTrade() {
+            const trade = {
+                id: Date.now(),
+                type: document.getElementById('logTradeType').value,
+                zone: document.getElementById('logZone').value,
+                entryDateTime: document.getElementById('logEntryDateTime').value,
+                entryPrice: parseFloat(document.getElementById('logEntryPrice').value),
+                entryContractPrice: parseFloat(document.getElementById('logEntryContractPrice').value),
+                contracts: parseInt(document.getElementById('logContracts').value) || 1,
+                exitDateTime: document.getElementById('logExitDateTime').value,
+                exitPrice: parseFloat(document.getElementById('logExitPrice').value),
+                exitContractPrice: parseFloat(document.getElementById('logExitContractPrice').value)
+            };
+            
+            if (!trade.zone || !trade.entryDateTime || !trade.entryPrice || !trade.entryContractPrice) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            let trades = JSON.parse(localStorage.getItem('tradeLogs') || '[]');
+            trades.push(trade);
+            localStorage.setItem('tradeLogs', JSON.stringify(trades));
+            
+            // Clear inputs
+            document.getElementById('logZone').value = '';
+            document.getElementById('logEntryDateTime').value = '';
+            document.getElementById('logEntryPrice').value = '';
+            document.getElementById('logEntryContractPrice').value = '';
+            document.getElementById('logContracts').value = '';
+            document.getElementById('logExitDateTime').value = '';
+            document.getElementById('logExitPrice').value = '';
+            document.getElementById('logExitContractPrice').value = '';
+            
+            displayTradeLogs();
+            updateStats();
+            showSaveIndicator();
+        }
+        
+        function displayTradeLogs() {
+            const trades = JSON.parse(localStorage.getItem('tradeLogs') || '[]');
+            const listEl = document.getElementById('tradeLogList');
+            
+            if (trades.length === 0) {
+                listEl.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">No trades logged yet</p>';
+                return;
+            }
+            
+            let html = '<h3 style="margin-bottom: 16px;">Trade History</h3>';
+            
+            trades.reverse().forEach((trade, index) => {
+                const pl = trade.exitContractPrice ? 
+                    (trade.exitContractPrice - trade.entryContractPrice) * 100 * trade.contracts : 0;
+                const plColor = pl >= 0 ? '#10b981' : '#ef4444';
+                
+                html += `
+                    <div style="background: #fafafa; padding: 20px; margin-bottom: 12px; border-radius: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <div>
+                                <strong style="color: ${trade.type === 'call' ? '#10b981' : '#ef4444'};">
+                                    ${trade.type.toUpperCase()} • Zone: ${trade.zone}
+                                </strong>
+                            </div>
+                            ${trade.exitContractPrice ? 
+                                `<div style="font-size: 1.2em; font-weight: 700; color: ${plColor};">
+                                    ${pl >= 0 ? '+' : ''}$${pl.toFixed(2)}
+                                </div>` : 
+                                '<div style="color: #6b7280;">Open</div>'
+                            }
+                        </div>
+                        <div style="font-size: 0.9em; color: #6b7280;">
+                            <div>Entry: ${trade.entryPrice} @ $${trade.entryContractPrice} • ${new Date(trade.entryDateTime).toLocaleString()}</div>
+                            ${trade.exitPrice ? 
+                                `<div>Exit: ${trade.exitPrice} @ $${trade.exitContractPrice} • ${new Date(trade.exitDateTime).toLocaleString()}</div>` : 
+                                ''
+                            }
+                            <div>Contracts: ${trade.contracts}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            listEl.innerHTML = html;
+        }
+        
+        function addWeeklyTrade() {
+            const trade = {
+                id: Date.now(),
+                type: document.getElementById('weeklyTradeType').value,
+                zone: document.getElementById('weeklyZone').value,
+                entryDateTime: document.getElementById('weeklyEntryDateTime').value,
+                entryPrice: parseFloat(document.getElementById('weeklyEntryPrice').value),
+                exitDateTime: document.getElementById('weeklyExitDateTime').value,
+                exitPrice: parseFloat(document.getElementById('weeklyExitPrice').value),
+                entryContractPrice: parseFloat(document.getElementById('weeklyEntryContractPrice').value),
+                exitContractPrice: parseFloat(document.getElementById('weeklyExitContractPrice').value),
+                profitLoss: (parseFloat(document.getElementById('weeklyExitContractPrice').value) - 
+                            parseFloat(document.getElementById('weeklyEntryContractPrice').value)) * 100
+            };
+            
+            if (!trade.zone || !trade.entryDateTime || !trade.exitDateTime) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            let weeklyTrades = JSON.parse(localStorage.getItem('weeklyTrades') || '[]');
+            weeklyTrades.push(trade);
+            localStorage.setItem('weeklyTrades', JSON.stringify(weeklyTrades));
+            
+            // Clear inputs
+            document.getElementById('weeklyZone').value = '';
+            document.getElementById('weeklyEntryDateTime').value = '';
+            document.getElementById('weeklyEntryPrice').value = '';
+            document.getElementById('weeklyExitDateTime').value = '';
+            document.getElementById('weeklyExitPrice').value = '';
+            document.getElementById('weeklyEntryContractPrice').value = '';
+            document.getElementById('weeklyExitContractPrice').value = '';
+            
+            displayWeeklyTrades();
+            updatePatternAnalysis();
+            showSaveIndicator();
+        }
+        
+        function displayWeeklyTrades() {
+            const trades = JSON.parse(localStorage.getItem('weeklyTrades') || '[]');
+            const listEl = document.getElementById('weeklyTradesList');
+            
+            if (trades.length === 0) {
+                listEl.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 12px;">No trades this week</p>';
+                return;
+            }
+            
+            let totalPL = 0;
+            let html = '';
+            
+            trades.forEach((trade, index) => {
+                totalPL += trade.profitLoss;
+                const plColor = trade.profitLoss >= 0 ? '#10b981' : '#ef4444';
+                
+                html += `
+                    <div style="background: white; padding: 16px; margin-bottom: 10px; border-radius: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <strong style="color: ${trade.type === 'CALL' ? '#10b981' : '#ef4444'};">
+                                ${trade.type} • ${trade.zone}
+                            </strong>
+                            <span style="font-weight: 700; color: ${plColor};">
+                                ${trade.profitLoss >= 0 ? '+' : ''}$${trade.profitLoss.toFixed(2)}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.85em; color: #6b7280;">
+                            Entry: ${trade.entryPrice} @ $${trade.entryContractPrice}<br>
+                            Exit: ${trade.exitPrice} @ $${trade.exitContractPrice}
+                        </div>
+                        <button onclick="removeWeeklyTrade(${index})" class="remove-zone" style="margin-top: 8px; width: auto;">Remove</button>
+                    </div>
+                `;
+            });
+            
+            html = `
+                <div style="background: #f0fdf4; padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 2px solid #10b981;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.9em; color: #065f46; font-weight: 600;">Total Weekly P&L</div>
+                        <div style="font-size: 2em; font-weight: 700; color: ${totalPL >= 0 ? '#10b981' : '#ef4444'};">
+                            ${totalPL >= 0 ? '+' : ''}$${totalPL.toFixed(2)}
+                        </div>
+                        <div style="font-size: 0.85em; color: #6b7280; margin-top: 4px;">${trades.length} trade${trades.length !== 1 ? 's' : ''}</div>
+                    </div>
+                </div>
+            ` + html;
+            
+            listEl.innerHTML = html;
+        }
+        
+        function removeWeeklyTrade(index) {
+            let trades = JSON.parse(localStorage.getItem('weeklyTrades') || '[]');
+            trades.splice(index, 1);
+            localStorage.setItem('weeklyTrades', JSON.stringify(trades));
+            displayWeeklyTrades();
+            updatePatternAnalysis();
+        }
+        
+        function updatePatternAnalysis() {
+            const trades = JSON.parse(localStorage.getItem('weeklyTrades') || '[]');
+            const analysisEl = document.getElementById('patternAnalysis');
+            
+            if (trades.length === 0) {
+                analysisEl.innerHTML = '<p>Add winning trades to see pattern analysis.</p>';
+                return;
+            }
+            
+            const callTrades = trades.filter(t => t.type === 'CALL');
+            const putTrades = trades.filter(t => t.type === 'PUT');
+            
+            const avgCallPL = callTrades.length > 0 ? 
+                callTrades.reduce((sum, t) => sum + t.profitLoss, 0) / callTrades.length : 0;
+            const avgPutPL = putTrades.length > 0 ? 
+                putTrades.reduce((sum, t) => sum + t.profitLoss, 0) / putTrades.length : 0;
+            
+            let html = `
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                    <div style="background: white; padding: 16px; border-radius: 12px;">
+                        <div style="font-weight: 600; color: #10b981; margin-bottom: 8px;">🟢 CALL Trades</div>
+                        <div>Count: ${callTrades.length}</div>
+                        <div>Avg P&L: $${avgCallPL.toFixed(2)}</div>
+                    </div>
+                    <div style="background: white; padding: 16px; border-radius: 12px;">
+                        <div style="font-weight: 600; color: #ef4444; margin-bottom: 8px;">🔴 PUT Trades</div>
+                        <div>Count: ${putTrades.length}</div>
+                        <div>Avg P&L: ${avgPutPL.toFixed(2)}</div>
+                    </div>
+                </div>
+            `;
+            
+            analysisEl.innerHTML = html;
+        }
+        
+        function saveWeeklyRecap() {
+            const weekDate = document.getElementById('weekDate').value;
+            const notes = document.getElementById('weeklyNotes').value;
+            const trades = JSON.parse(localStorage.getItem('weeklyTrades') || '[]');
+            
+            if (!weekDate) {
+                alert('Please select a week date');
+                return;
+            }
+            
+            const recap = {
+                weekDate,
+                notes,
+                trades: [...trades],
+                savedDate: new Date().toISOString()
+            };
+            
+            let recaps = JSON.parse(localStorage.getItem('weeklyRecaps') || '[]');
+            
+            const existingIndex = recaps.findIndex(r => r.weekDate === weekDate);
+            if (existingIndex >= 0) {
+                recaps[existingIndex] = recap;
+            } else {
+                recaps.push(recap);
+            }
+            
+            recaps.sort((a, b) => new Date(b.weekDate) - new Date(a.weekDate));
+            
+            localStorage.setItem('weeklyRecaps', JSON.stringify(recaps));
+            localStorage.removeItem('weeklyTrades');
+            
+            displayWeeklyTrades();
+            updatePatternAnalysis();
+            displayRecapHistory();
+            
+            showSaveIndicator();
+            alert('Weekly recap saved!');
+        }
+        
+        function displayRecapHistory() {
+            const recaps = JSON.parse(localStorage.getItem('weeklyRecaps') || '[]');
+            const historyEl = document.getElementById('recapHistory');
+            
+            if (recaps.length === 0) {
+                historyEl.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 20px;">No saved recaps yet</p>';
+                return;
+            }
+            
+            let html = '<h3 style="margin-top: 32px; margin-bottom: 16px;">Saved Recaps</h3>';
+            
+            recaps.forEach((recap, index) => {
+                const weekDate = new Date(recap.weekDate);
+                let totalPL = 0;
+                recap.trades.forEach(t => totalPL += t.profitLoss);
+                const plColor = totalPL >= 0 ? '#10b981' : '#ef4444';
+                
+                html += `
+                    <div style="background: white; padding: 20px; margin-bottom: 16px; border-radius: 12px; border: 1px solid #f0f0f0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 4px;">Week of ${weekDate.toLocaleDateString()}</div>
+                                <div style="font-size: 0.85em; color: #6b7280;">${recap.trades.length} trade${recap.trades.length !== 1 ? 's' : ''}</div>
+                            </div>
+                            <div style="font-size: 1.5em; font-weight: 700; color: ${plColor};">
+                                ${totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)}
+                            </div>
+                        </div>
+                        ${recap.notes ? `
+                            <div style="background: #fafafa; padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.9em;">
+                                <strong>Notes:</strong> ${recap.notes}
+                            </div>
+                        ` : ''}
+                        <button onclick="deleteRecap(${index})" style="margin-top: 12px; background: #ef4444; padding: 8px 16px; font-size: 0.85em; width: auto;">Delete Recap</button>
+                    </div>
+                `;
+            });
+            
+            historyEl.innerHTML = html;
+        }
+        
+        function deleteRecap(index) {
+            if (confirm('Delete this recap?')) {
+                let recaps = JSON.parse(localStorage.getItem('weeklyRecaps') || '[]');
+                recaps.splice(index, 1);
+                localStorage.setItem('weeklyRecaps', JSON.stringify(recaps));
+                displayRecapHistory();
+                showSaveIndicator();
+            }
         }
         
         function showPage(pageName) {
@@ -1018,7 +1452,12 @@
             });
         });
         
-        window.addEventListener('load', loadSavedData);
+        window.addEventListener('load', () => {
+            loadSavedData();
+            const today = new Date();
+            const monday = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+            document.getElementById('weekDate').value = monday.toISOString().split('T')[0];
+        });
     </script>
 </body>
 </html>
