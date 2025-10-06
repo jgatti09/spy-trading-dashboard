@@ -614,12 +614,15 @@
                     </ul>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
                     <button onclick="runStrategyBacktest()" style="background: #4f7cff; font-size: 1.1em; padding: 16px;">
                         🎯 Run Strategy Backtest (2 Years)
                     </button>
                     <button onclick="runZoneBehaviorAnalysis()" style="background: #10b981; font-size: 1.1em; padding: 16px;">
                         📊 Analyze Zone Behavior Patterns
+                    </button>
+                    <button onclick="downloadBacktestResults()" style="background: #f59e0b; font-size: 1.1em; padding: 16px;">
+                        📥 Download Results JSON
                     </button>
                 </div>
                 
@@ -2430,23 +2433,39 @@
         
         function downloadBacktestResults() {
             if (!window.backtestResultsData) {
-                alert('No backtest results available. Please run a backtest first.');
+                alert('⚠️ No backtest results available.\n\nPlease run a backtest first by clicking "🎯 Run Strategy Backtest (2 Years)"');
                 return;
             }
             
-            const dataStr = JSON.stringify(window.backtestResultsData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `spy-backtest-results-${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            alert('✓ Backtest results downloaded! Upload this file to Claude to analyze and refine your strategy.');
+            try {
+                const dataStr = JSON.stringify(window.backtestResultsData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `spy-backtest-results-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.style.cssText = 'position: fixed; top: 80px; right: 24px; background: #10b981; color: white; padding: 20px 24px; border-radius: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(16,185,129,0.3); z-index: 10000; animation: slideIn 0.3s ease;';
+                successDiv.innerHTML = '✓ Backtest results downloaded!<br><span style="font-size: 0.9em; font-weight: 400;">Upload this JSON file to Claude for analysis</span>';
+                document.body.appendChild(successDiv);
+                
+                setTimeout(() => {
+                    successDiv.style.opacity = '0';
+                    successDiv.style.transition = 'opacity 0.3s';
+                    setTimeout(() => successDiv.remove(), 300);
+                }, 4000);
+                
+            } catch (error) {
+                alert('❌ Download failed: ' + error.message + '\n\nPlease try running the backtest again.');
+                console.error('Download error:', error);
+            }
         }
         
         async function runStrategyBacktest() {
