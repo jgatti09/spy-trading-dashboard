@@ -1064,7 +1064,8 @@
             html += '<p style="margin-bottom: 8px;">• Analyzes 90 days of daily price action</p>';
             html += '<p style="margin-bottom: 8px;">• Identifies swing highs/lows where price reversed</p>';
             html += '<p style="margin-bottom: 8px;">• Tests zones against future price movement</p>';
-            html += '<p>• Ranks by confidence: tests + bounces + recency</p>';
+            html += '<p style="margin-bottom: 8px;">• Ranks by confidence: tests + bounces + recency</p>';
+            html += '<p style="color: #ef4444; font-weight: 500;">⚠️ Note: Zones can FLIP when broken - Old supply becomes new demand & vice versa</p>';
             html += '</div></div>';
             
             html += '<div style="margin-top: 16px; text-align: center;">';
@@ -1476,10 +1477,10 @@
                 }
             });
             
-            // Find nearby zones (within 5 points)
+            // Find nearby zones (within 15 points)
             zones.supply.forEach(zone => {
                 const distance = zone.bottom - price;
-                if (distance > 0 && distance <= 5) {
+                if (distance > 0 && distance <= 15) {
                     nearbyZones.push({
                         type: 'supply',
                         zone: zone,
@@ -1491,7 +1492,7 @@
             
             zones.demand.forEach(zone => {
                 const distance = price - zone.top;
-                if (distance > 0 && distance <= 5) {
+                if (distance > 0 && distance <= 15) {
                     nearbyZones.push({
                         type: 'demand',
                         zone: zone,
