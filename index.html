@@ -2367,7 +2367,10 @@
                     avgLoss,
                     totalPL,
                     avgRR,
-                    totalDays
+                    totalDays,
+                    totalPL_100Shares,
+                    avgWin_100Shares,
+                    avgLoss_100Shares
                 },
                 byConfidence: {
                     high: {
@@ -2506,11 +2509,21 @@
                 return;
             }
             
+            // Validate parameters exist
+            const stopLossBufferEl = document.getElementById('stopLossBuffer');
+            const takeProfitStyleEl = document.getElementById('takeProfitStyle');
+            const minConfidenceEl = document.getElementById('minConfidence');
+            
+            if (!stopLossBufferEl || !takeProfitStyleEl || !minConfidenceEl) {
+                alert('Error: Backtest parameter controls not found. Please refresh the page.');
+                return;
+            }
+            
             const resultsDiv = document.getElementById('backtestResults');
             resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;"><h3>🎯 Running Strategy Backtest...</h3><p style="color: #6b7280;">Loading 2 years of 4-hour candle data and simulating trades with your exact rules...</p><p style="color: #6b7280; margin-top: 12px;">This will take 30-60 seconds</p></div>';
             
             try {
-                // Get 2 years of data - we'll use daily bars and simulate 4H behavior
+                // Get 2 years of 4H data
                 const to = new Date();
                 const from = new Date();
                 from.setFullYear(from.getFullYear() - 2);
@@ -2542,7 +2555,8 @@
                 displayBacktestResults(backtestResults, data.results.length);
                 
             } catch (error) {
-                resultsDiv.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;"><h3>Error: ${error.message}</h3></div>`;
+                console.error('Backtest error:', error);
+                resultsDiv.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;"><h3>Error: ${error.message}</h3><p style="margin-top: 12px; color: #6b7280;">Check console for details</p></div>`;
             }
         }
         
