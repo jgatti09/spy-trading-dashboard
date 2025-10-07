@@ -2511,10 +2511,10 @@
             }
             
             const resultsDiv = document.getElementById('backtestResults');
-            resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;"><h3>🎯 Running Strategy Backtest...</h3><p style="color: #6b7280;">Loading 2 years of 4-hour candle data and simulating trades with your exact rules...</p><p style="color: #6b7280; margin-top: 12px;">This will take 30-60 seconds</p></div>';
+            resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;"><h3>🎯 Running Strategy Backtest...</h3><p style="color: #6b7280;">Requesting 2 years of 4-hour data from Polygon.io...</p><p style="color: #6b7280; margin-top: 12px;">This may take 30-60 seconds</p></div>';
             
             try {
-                // Get 2 years of data - we'll use daily bars and simulate 4H behavior
+                // Get 2 years of 4-hour data - use proper date range
                 const to = new Date();
                 const from = new Date();
                 from.setFullYear(from.getFullYear() - 2);
@@ -2522,22 +2522,35 @@
                 const fromStr = from.toISOString().split('T')[0];
                 const toStr = to.toISOString().split('T')[0];
                 
+                console.log(`Requesting SPY data from ${fromStr} to ${toStr}`);
+                
+                // Request 4-hour bars (240 minutes) with increased limit
                 const response = await fetch(
-                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/240/minute/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`
+                    `https://api.polygon.io/v2/aggs/ticker/SPY/range/4/hour/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`
                 );
                 
                 if (!response.ok) {
-                    throw new Error('Failed to load historical data');
+                    throw new Error(`API Error: ${response.status} - ${response.statusText}`);
                 }
                 
                 const data = await response.json();
                 
+                console.log('API Response:', data);
+                
                 if (!data.results || data.results.length === 0) {
-                    throw new Error('No historical data available');
+                    throw new Error('No historical data returned from Polygon.io. Check your API key tier.');
                 }
+                
+                console.log(`Received ${data.results.length} 4-hour bars spanning ${new Date(data.results[0].t).toLocaleDateString()} to ${new Date(data.results[data.results.length-1].t).toLocaleDateString()}`);
+                
+                resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;"><h3>📊 Analyzing Data...</h3><p style="color: #6b7280;">Detecting supply and demand zones...</p></div>';
                 
                 // Detect zones from historical data
                 const detectedZones = detectZones(data.results);
+                
+                console.log(`Detected ${detectedZones.supply.length} supply zones and ${detectedZones.demand.length} demand zones`);
+                
+                resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center;"><h3>🎲 Simulating Trades...</h3><p style="color: #6b7280;">Running backtest with your parameters...</p></div>';
                 
                 // Run backtest simulation
                 const backtestResults = simulateTrades(data.results, detectedZones);
@@ -2546,7 +2559,8 @@
                 displayBacktestResults(backtestResults, data.results.length);
                 
             } catch (error) {
-                resultsDiv.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;"><h3>Error: ${error.message}</h3></div>`;
+                console.error('Backtest error:', error);
+                resultsDiv.innerHTML = `<div style="padding: 20px; text-align: center; color: #ef4444;"><h3>Error: ${error.message}</h3><p style="margin-top: 12px;">Check console (F12) for details</p></div>`;
             }
         }
         
